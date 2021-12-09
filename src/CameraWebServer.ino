@@ -51,16 +51,16 @@ void setup() {
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
-  config.pixel_format = PIXFORMAT_GRAYSCALE;
+  config.pixel_format = PIXFORMAT_GRAYSCALE; // default is PIXFORMAT_JPEG
   
   // if PSRAM IC present, init with UXGA resolution and higher JPEG quality
   //                      for larger pre-allocated frame buffer.
   if(psramFound()){
-    config.frame_size = FRAMESIZE_UXGA;
+    config.frame_size = FRAMESIZE_240X240;
     config.jpeg_quality = 10;
-    config.fb_count = 2;
+    config.fb_count = 1;
   } else {
-    config.frame_size = FRAMESIZE_SVGA;
+    config.frame_size = FRAMESIZE_240X240;
     config.jpeg_quality = 12;
     config.fb_count = 1;
   }
@@ -85,30 +85,42 @@ void setup() {
     s->set_saturation(s, -2); // lower the saturation
   }
   // drop down frame size for higher initial frame rate
-  s->set_framesize(s, FRAMESIZE_QVGA);
+  s->set_framesize(s, FRAMESIZE_240X240);
 
 #if defined(CAMERA_MODEL_M5STACK_WIDE) || defined(CAMERA_MODEL_M5STACK_ESP32CAM)
   s->set_vflip(s, 1);
   s->set_hmirror(s, 1);
 #endif
 
-  WiFi.begin(ssid, password);
-
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("");
-  Serial.println("WiFi connected");
-
-  startCameraServer();
-
-  Serial.print("Camera Ready! Use 'http://");
-  Serial.print(WiFi.localIP());
-  Serial.println("' to connect");
+  Serial.println("Setup done.");
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  delay(10000);
+  // Get image and send on serial
+  camera_fb_t* frame_buffer = esp_camera_fb_get();
+  if (frame_buffer != nullptr) {
+    uint8_t* data = frame_buffer->buf;
+    Serial.println("Got image.");
+    // Interesting: Length is 1920000, which is much higher than width*height.
+    // This is probably the size of the largest image possible
+    Serial.print("Length: "); Serial.println(frame_buffer->len);
+    Serial.print("Width: "); Serial.println(frame_buffer->width);
+    Serial.print("Height: "); Serial.println(frame_buffer->height);
+    Serial.print("Format: "); Serial.println(frame_buffer->format);
+
+    Serial.print("[");
+    for (size_t y = 0; y < frame_buffer->height; ++y) {
+      String line = "";
+      for (size_t x = 0; x < frame_buffer->width; ++x) {
+        // image_str += String(data[y*frame_buffer->height+x], 16);
+        line += String(data[y*frame_buffer->height+x]) + ' ';
+      }
+      line += "; ";
+      Serial.println(line);
+    }
+    Serial.println("]");
+    // This is needed to be able to access the frame buffer again
+    esp_camera_fb_return(frame_buffer);
+  }
+  delay(5000);
 }

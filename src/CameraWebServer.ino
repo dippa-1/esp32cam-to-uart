@@ -20,8 +20,8 @@
 
 #include "camera_pins.h"
 
-const char* ssid = "Ahorn8";
-const char* password = "85845946949101447612";
+const char* ssid = "";
+const char* password = "";
 
 void startCameraServer();
 
